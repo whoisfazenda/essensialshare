@@ -7,3 +7,6 @@ local.properties
 *.apk
 build-log.txt
 dist/
+keystore.properties
+*.jks
+*.keystore

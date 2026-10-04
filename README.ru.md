@@ -62,7 +62,7 @@ gradlew.bat :desktop:renderPreview          # рисует экраны ПК в 
 powershell -File installer\build-installer.ps1   # упаковывает приложение в EssentialShare-Setup.exe
 ```
 
-Скрипт установщика использует IExpress, он есть в Windows. Для релизного APK нужна своя подпись.
+Скрипт установщика использует IExpress, он есть в Windows. Чтобы подписать релизный APK, создайте `keystore.properties` (в git не попадает) с `storeFile`, `storePassword`, `keyAlias`, `keyPassword`; без него релизная сборка подписывается отладочным ключом.
 
 ## Структура
 

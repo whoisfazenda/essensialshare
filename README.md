@@ -62,7 +62,7 @@ gradlew.bat :desktop:renderPreview          # renders the PC screens to PNG with
 powershell -File installer\build-installer.ps1   # wraps the app image into EssentialShare-Setup.exe
 ```
 
-The installer script uses IExpress, which ships with Windows. The release APK needs your own signing config.
+The installer script uses IExpress, which ships with Windows. For a signed release APK create `keystore.properties` (git-ignored) with `storeFile`, `storePassword`, `keyAlias`, `keyPassword`; without it the release build uses the debug key.
 
 ## Layout
 
