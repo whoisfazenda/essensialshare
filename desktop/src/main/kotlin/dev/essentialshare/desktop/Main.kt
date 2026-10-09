@@ -25,6 +25,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberTrayState
 import androidx.compose.ui.window.rememberWindowState
 import dev.essentialshare.core.Identity
+import dev.essentialshare.core.LinkState
 import dev.essentialshare.core.NodeConfig
 import dev.essentialshare.core.NodeEvent
 import dev.essentialshare.core.Platform
@@ -137,10 +138,18 @@ class Controller(private val scope: CoroutineScope) : Actions {
         }
     }
 
+    /** The device a file with no explicit target should go to: the selected one, else the only live one. */
+    private fun pickTarget(): String? {
+        val peers = node.peers.value
+        selectedId?.let { id -> if (peers.any { it.id == id && it.state != LinkState.OFFLINE }) return id }
+        // a connected device wins over merely discovered ones
+        peers.filter { it.state == LinkState.READY }.singleOrNull()?.let { return it.id }
+        return peers.filter { it.state != LinkState.OFFLINE }.singleOrNull()?.id
+    }
+
     private fun target(): String? {
         selectedId?.let { return it }
-        val online = node.peers.value.filter { it.state != dev.essentialshare.core.LinkState.OFFLINE }
-        if (online.size == 1) return online[0].id
+        pickTarget()?.let { return it }
         say(tr("Select a device first", "Сначала выберите устройство"))
         return null
     }
@@ -246,8 +255,8 @@ class Controller(private val scope: CoroutineScope) : Actions {
             val files = incomingPaths.toList().also { incomingPaths.clear() }
             if (files.isEmpty()) return@launch
             settingsOpen = false
-            val online = node.peers.value.filter { it.state != dev.essentialshare.core.LinkState.OFFLINE }
-            if (online.size == 1) { sendTo(online[0].id, files); say(tr("Sending ${files.size} item(s)", "Отправляем: ${files.size}")) }
+            val target = pickTarget()
+            if (target != null) { sendTo(target, files); say(tr("Sending ${files.size} item(s)", "Отправляем: ${files.size}")) }
             else { pending = pending + files; bringToFront() }
         }
     }
@@ -257,7 +266,7 @@ fun main(args: Array<String>) {
     runCatching { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()) }
     val tray = "--tray" in args
     val paths = args.filter { !it.startsWith("--") }
-    if (SingleInstance.handOff(paths)) return
+    if (!SingleInstance.claimOrHandOff(paths)) return
     application {
         val scope = rememberCoroutineScope0()
         val c = remember { Controller(scope).also { it.start(); it.visible = !tray } }

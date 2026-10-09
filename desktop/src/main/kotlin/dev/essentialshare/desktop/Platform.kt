@@ -220,8 +220,23 @@ class ClipboardSync(private val node: ShareNode, private val enabled: () -> Bool
 object SingleInstance {
     private const val PORT = 47892
 
-    /** Returns true when another instance took the message; false when we are the first. */
-    fun handOff(args: List<String>): Boolean = try {
+    private var server: ServerSocket? = null
+
+    /**
+     * Claims the single-instance port before anything else starts. Returns true when this process is the
+     * first one; otherwise it hands [args] to the running instance (retrying while that one is still starting).
+     */
+    fun claimOrHandOff(args: List<String>): Boolean {
+        repeat(20) {
+            server = runCatching { ServerSocket(PORT, 16, InetAddress.getLoopbackAddress()) }.getOrNull()
+            if (server != null) return true
+            if (send(args)) return false
+            Thread.sleep(250)
+        }
+        return true
+    }
+
+    private fun send(args: List<String>): Boolean = try {
         Socket(InetAddress.getLoopbackAddress(), PORT).use { s ->
             s.getOutputStream().bufferedWriter(Charsets.UTF_8).use { w ->
                 w.write("ESHARE\n"); args.forEach { w.write(it + "\n") }
@@ -233,7 +248,7 @@ object SingleInstance {
     }
 
     fun listen(onMessage: (List<String>) -> Unit) {
-        val server = runCatching { ServerSocket(PORT, 8, InetAddress.getLoopbackAddress()) }.getOrNull() ?: return
+        val server = server ?: return
         Thread({
             while (true) {
                 try {

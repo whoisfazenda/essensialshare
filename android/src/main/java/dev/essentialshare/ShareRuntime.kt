@@ -13,6 +13,7 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.PowerManager
 import android.provider.MediaStore
+import android.webkit.MimeTypeMap
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -42,15 +43,38 @@ class PrefsStore(private val p: SharedPreferences) : Store {
 
 /** Saves received files into Downloads/Essential Share through MediaStore (no storage permission needed). */
 class MediaStoreReceiver(private val ctx: Context) : FileReceiver {
+    /** "name.ext" -> "name (1).ext", "name (2).ext"...: the extension always stays last. */
+    private fun uniqueName(resolver: android.content.ContentResolver, relPath: String, file: String): String {
+        val base = file.substringBeforeLast('.', file)
+        val ext = file.substringAfterLast('.', "").let { if (it.isEmpty() || it == file) "" else ".$it" }
+        val args = android.os.Bundle().apply {
+            putString(android.content.ContentResolver.QUERY_ARG_SQL_SELECTION, "${MediaStore.Downloads.RELATIVE_PATH}=? AND ${MediaStore.Downloads.DISPLAY_NAME}=?")
+            putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_INCLUDE)
+        }
+        fun taken(n: String): Boolean = runCatching {
+            args.putStringArray(android.content.ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, arrayOf("$relPath/", n))
+            resolver.query(MediaStore.Downloads.EXTERNAL_CONTENT_URI, arrayOf(MediaStore.Downloads._ID), args, null)?.use { it.count > 0 } ?: false
+        }.getOrDefault(false)
+        var name = file
+        var i = 1
+        while (taken(name) && i < 1000) name = "$base ($i)$ext".also { i++ }
+        return name
+    }
+
     override fun open(name: String, size: Long, mime: String): SinkHandle {
         val parts = name.split('/')
-        val file = parts.last()
         val sub = parts.dropLast(1).joinToString("/")
         val resolver = ctx.contentResolver
+        val relPath = "Download/Essential Share" + if (sub.isNotEmpty()) "/$sub" else ""
+        val file = uniqueName(resolver, relPath, parts.last())
+        // the type follows the extension: a wrong or generic type makes MediaStore rewrite the name
+        val ext = file.substringAfterLast('.', "").lowercase()
+        val mimeOut = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
+            ?: mime.takeIf { it.isNotBlank() && it != "application/octet-stream" } ?: "application/octet-stream"
         val values = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, file)
-            put(MediaStore.Downloads.MIME_TYPE, mime.ifBlank { "application/octet-stream" })
-            put(MediaStore.Downloads.RELATIVE_PATH, "Download/Essential Share" + if (sub.isNotEmpty()) "/$sub" else "")
+            put(MediaStore.Downloads.MIME_TYPE, mimeOut)
+            put(MediaStore.Downloads.RELATIVE_PATH, relPath)
             put(MediaStore.Downloads.IS_PENDING, 1)
         }
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: error("MediaStore refused the file")
