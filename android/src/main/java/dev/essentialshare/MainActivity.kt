@@ -272,9 +272,22 @@ private fun HomeScreen(onSettings: () -> Unit, onDevice: (PeerInfo) -> Unit, sel
 @Composable
 private fun Gapw8() = androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
 
-private fun openFile(ctx: Context, result: String?) {
+internal fun openFile(ctx: Context, result: String?) {
     val uri = result?.let(Uri::parse) ?: return
     val mime = ctx.contentResolver.getType(uri)
+    if (mime == "application/vnd.android.package-archive") {
+        // the installer ignores apps that are not allowed to install packages: send the user to that switch first
+        if (!ctx.packageManager.canRequestPackageInstalls()) {
+            android.widget.Toast.makeText(ctx, tr("Allow Essential Share to install apps, then open the file again", "Разрешите Essential Share устанавливать приложения и откройте файл снова"), android.widget.Toast.LENGTH_LONG).show()
+            runCatching {
+                ctx.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + ctx.packageName)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            return
+        }
+        val install = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (runCatching { ctx.startActivity(install) }.isSuccess) return
+    }
     fun view(type: String) = Intent(Intent.ACTION_VIEW).setDataAndType(uri, type)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
     // the exact type first; if nothing handles it, offer every app that accepts any file; last resort: the folder

@@ -107,8 +107,8 @@ object Notifier {
         val b = builder(ctx).setContentTitle(tr("Received from ", "Получено от ") + t.peerName).setContentText(t.name)
         t.result?.let { r ->
             val uri = Uri.parse(r)
-            val mime = ctx.contentResolver.getType(uri) ?: "*/*"
-            val view = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            // our own tiny activity opens it, so APKs can go through the install permission check first
+            val view = Intent(ctx, OpenFileActivity::class.java).setData(uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             b.setContentIntent(PendingIntent.getActivity(ctx, (t.id and 0xffff).toInt(), view, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
         }
         nm.notify(ID_BASE + (t.id and 0xffff).toInt(), b.build())

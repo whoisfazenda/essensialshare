@@ -50,3 +50,12 @@ class ClipboardSendActivity : Activity() {
         super.onDestroy()
     }
 }
+
+/** Opens a received file from a notification; invisible, it hands over to [openFile] and closes. */
+class OpenFileActivity : Activity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        openFile(this, intent?.data?.toString())
+        finish()
+    }
+}
