@@ -4,15 +4,19 @@ import android.app.Application
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.net.wifi.WifiManager
 import android.os.IBinder
 import android.os.PowerManager
+import androidx.core.content.ContextCompat
 import dev.essentialshare.core.LinkState
 import dev.essentialshare.core.TransferState
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
@@ -24,12 +28,49 @@ class ShareService : Service() {
     private var lastUpdate = 0L
     private var lastText = ""
 
+    // Touch to share, receiving side: while the screen is on the phone only advertises itself over Bluetooth LE
+    // (no scanning), so a phone that is touched to it can find it even though the app is closed.
+    private var beacon: TouchRadar? = null
+    private var beaconJob: Job? = null
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) { tickBeacon() }
+    }
+
+    // ...and listens for one thing only: a phone asking it to join a direct Wi-Fi link (nobody shares a network)
+    private var requests: RequestScanner? = null
+
+    private fun tickBeacon() {
+        val on = getSystemService(PowerManager::class.java).isInteractive && TouchRadar.canAdvertise() &&
+            TouchRadar.unavailable(this) == null && Rt.node.port != 0
+        if (!on) { stopBeacon(); return }
+        val b = beacon ?: TouchRadar(this, Rt.scope).also { beacon = it; it.start(scan = false) }
+        b.refreshAdvertising()
+        if (Rt.hasPermission(android.Manifest.permission.BLUETOOTH_SCAN)) {
+            val r = requests ?: RequestScanner(this) { sender, seed, port ->
+                // the touch is felt: show the animation at once, then join the other phone's direct link
+                TouchOverlay.showAwaiting(this, sender)
+                Direct.join(this, sender, seed, port) { TouchOverlay.dismiss(this) }
+            }.also { requests = it }
+            if (!r.running) r.start()
+        }
+    }
+
+    private fun stopBeacon() {
+        beacon?.stop(); beacon = null
+        requests?.stop(); requests = null
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         Notifier.channels(this)
         Rt.acquire()
+        ContextCompat.registerReceiver(
+            this, screenReceiver, IntentFilter(Intent.ACTION_SCREEN_ON).apply { addAction(Intent.ACTION_SCREEN_OFF) },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        beaconJob = Rt.scope.launch { while (true) { tickBeacon(); delay(10_000) } }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -80,6 +121,9 @@ class ShareService : Service() {
     }
 
     override fun onDestroy() {
+        beaconJob?.cancel()
+        runCatching { unregisterReceiver(screenReceiver) }
+        stopBeacon()
         job?.cancel()
         setBoost(false)
         Rt.release()

@@ -25,5 +25,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Essential Share"
+rootProject.name = "EShare"
 include(":core", ":android", ":desktop")

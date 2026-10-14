@@ -1,12 +1,12 @@
-# Builds EssentialShare-Setup.exe (self-extracting installer) from the app image.
+# Builds EShare-Setup.exe (self-extracting installer) from the app image.
 # Needs only what ships with Windows (IExpress). Run after `gradlew :desktop:createDistributable`.
 param(
-    [string]$AppDir = (Join-Path $PSScriptRoot '..\desktop\build\compose\binaries\main\app\Essential Share'),
-    [string]$Out    = (Join-Path $PSScriptRoot '..\dist\EssentialShare-Setup.exe')
+    [string]$AppDir = (Join-Path $PSScriptRoot '..\desktop\build\compose\binaries\main\app\EShare'),
+    [string]$Out    = (Join-Path $PSScriptRoot '..\dist\EShare-Setup.exe')
 )
 $ErrorActionPreference = 'Stop'
 $AppDir = (Resolve-Path $AppDir).Path
-$work = Join-Path $env:TEMP 'essential-share-setup'
+$work = Join-Path $env:TEMP 'eshare-setup'
 if (Test-Path $work) { Remove-Item $work -Recurse -Force }
 New-Item -ItemType Directory $work | Out-Null
 
@@ -37,7 +37,7 @@ InstallPrompt=
 DisplayLicense=
 FinishMessage=
 TargetName=$outFull
-FriendlyName=Essential Share Setup
+FriendlyName=EShare Setup
 AppLaunched=powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File install.ps1
 PostInstallCmd=<None>
 AdminQuietInstCmd=

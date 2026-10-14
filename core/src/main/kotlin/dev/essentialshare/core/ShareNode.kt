@@ -245,6 +245,40 @@ class ShareNode(
         }
     }
 
+    /**
+     * Connect to a device that announced itself by touch (Bluetooth LE): [idPrefix] is the start of its device id,
+     * [host]/[port] its address on the shared network. If the address is missing or does not answer, a device with
+     * that id prefix seen by the network discovery is tried instead. The answer is true once a link to that device
+     * exists, also when the other phone got there first (both phones connect at the same moment).
+     */
+    fun connectNearby(
+        idPrefix: String, host: String?, port: Int, timeoutMs: Int = 3000,
+        socketFactory: (() -> Socket)? = null, onResult: (Boolean) -> Unit = {},
+    ) {
+        fun linked() = links.values.any { it.alive && it.peerId.startsWith(idPrefix) }
+        io.execute {
+            var ok = linked()
+            if (!ok && host != null && port > 0) {
+                ok = try {
+                    // [socketFactory]: a socket tied to one particular network (a direct Wi-Fi link is not the default one)
+                    val sock = socketFactory?.invoke() ?: Socket()
+                    sock.connect(InetSocketAddress(host, port), timeoutMs)
+                    val link = establish(sock, initiator = true)
+                    when {
+                        link == null -> linked()
+                        !link.peerId.startsWith(idPrefix) -> { link.close("not the touched device"); false }
+                        else -> true
+                    }
+                } catch (e: Exception) { log("connectNearby $host:$port: $e"); linked() }
+            }
+            if (!ok) {
+                val id = seen.keys.firstOrNull { it.startsWith(idPrefix) }
+                if (id != null) ok = runCatching { connect(id) != null }.getOrDefault(false) || linked()
+            }
+            onResult(ok)
+        }
+    }
+
     private fun establish(sock: Socket, initiator: Boolean): Link? {
         sock.tcpNoDelay = true
         sock.sendBufferSize = 1 shl 20
@@ -332,6 +366,11 @@ class ShareNode(
     /** Start talking to a device that was seen on the network (this is what starts pairing for a new one). */
     fun connectPeer(peerId: String) {
         io.execute { runCatching { connect(peerId) } }
+    }
+
+    /** Tell the device whose id starts with [idPrefix] that it was touched, so it can show the animation. */
+    fun announceTouch(idPrefix: String) {
+        io.execute { links.values.firstOrNull { it.alive && it.peerId.startsWith(idPrefix) }?.send(T_TOUCH) }
     }
 
     /** Push a changed device name to the network and to every open link. */
@@ -424,6 +463,7 @@ class ShareNode(
         @Volatile private var localOk = false
         @Volatile private var remoteOk = false
         @Volatile private var lastRx = System.currentTimeMillis()
+        @Volatile private var lastTouchEvent = 0L
         @Volatile private var counted = true
         private val waiting = CopyOnWriteArrayList<Pair<(Link) -> Unit, (String) -> Unit>>()
 
@@ -508,7 +548,7 @@ class ShareNode(
         private fun handle(f: ByteArray) {
             val d = DataInputStream(f.inputStream(1, f.size - 1))
             val type = f[0].toInt()
-            if (!ready && type != T_HELLO && type != T_PAIR_OK && type != T_PAIR_NO && type != T_PING && type != T_PONG) {
+            if (!ready && type != T_HELLO && type != T_PAIR_OK && type != T_PAIR_NO && type != T_PING && type != T_PONG && type != T_TOUCH) {
                 throw IOException("unexpected message $type before pairing")
             }
             when (type) {
@@ -534,6 +574,11 @@ class ShareNode(
                 T_PAIR_NO -> close("pairing declined")
                 T_PING -> send(T_PONG)
                 T_PONG -> {}
+                T_TOUCH -> {
+                    // one animation per touch: a peer cannot flood the screen with it
+                    val now = System.currentTimeMillis()
+                    if (now - lastTouchEvent > 8000) { lastTouchEvent = now; _events.tryEmit(NodeEvent.Touched(peerId, name)) }
+                }
                 T_TEXT -> {
                     val id = d.readLong()
                     val clip = d.readByte().toInt() and 1 != 0
@@ -749,5 +794,6 @@ class ShareNode(
         private const val T_DONE = 10
         private const val T_PING = 11
         private const val T_PONG = 12
+        private const val T_TOUCH = 13
     }
 }

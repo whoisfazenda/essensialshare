@@ -38,6 +38,7 @@ import dev.essentialshare.core.OutgoingFile
 import dev.essentialshare.ui.DeviceCard
 import dev.essentialshare.ui.Ic
 import dev.essentialshare.ui.N
+import dev.essentialshare.ui.NButton
 import dev.essentialshare.ui.NCaps
 import dev.essentialshare.ui.NIconButton
 import dev.essentialshare.ui.NMeta
@@ -51,7 +52,7 @@ import kotlin.concurrent.thread
 class ShareTargetActivity : ComponentActivity() {
     private var files: List<OutgoingFile> = emptyList()
     private var text: String? = null
-    private var prepared = false
+    private var prepared by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -79,12 +80,19 @@ class ShareTargetActivity : ComponentActivity() {
         val peers by Rt.node.peers.collectAsState()
         val pairing by Rt.node.pairing.collectAsState()
         var target by remember { mutableStateOf<String?>(null) }
+        var touching by remember { mutableStateOf(false) }
         val usable = peers.filter { it.state != LinkState.OFFLINE }
         val count = if (files.isNotEmpty()) files.size else 1
 
         // pairing finished: the queued send runs by itself, so the sheet can go
         val t = target
         if (t != null && pairing.isEmpty() && peers.firstOrNull { it.id == t }?.trusted == true) finish()
+
+        if (touching) {
+            TouchScreen(files, text, canPick = false) { touching = false }
+            pairing.firstOrNull()?.let { req -> PairDialog(req) { ok -> Rt.node.answerPairing(req.peerId, ok) } }
+            return
+        }
 
         Box(
             Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f))
@@ -99,7 +107,7 @@ class ShareTargetActivity : ComponentActivity() {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        NCaps(tr("Essential Share · $count item(s)", "Essential Share · элементов: $count"))
+                        NCaps(tr("EShare · $count item(s)", "EShare · элементов: $count"))
                         NText(tr("Send to", "Отправить на"), style = NType.headline)
                     }
                     NIconButton(Ic.CLOSE, { finish() }, tint = N.secondary)
@@ -107,7 +115,7 @@ class ShareTargetActivity : ComponentActivity() {
                 if (usable.isEmpty()) {
                     Column(Modifier.fillMaxWidth().nCard(20.dp, N.surfaceRaised).padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         NText(tr("Looking for devices…", "Ищем устройства…"), style = NType.bodyMedium)
-                        NMeta(tr("Open Essential Share on your PC, same Wi-Fi.", "Откройте Essential Share на ПК, тот же Wi-Fi."), maxLines = 3)
+                        NMeta(tr("Open EShare on your PC, same Wi-Fi.", "Откройте EShare на ПК, тот же Wi-Fi."), maxLines = 3)
                     }
                 }
                 LazyColumn(Modifier.heightIn(max = 360.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -121,6 +129,10 @@ class ShareTargetActivity : ComponentActivity() {
                         }
                     }
                 }
+                NButton(
+                    tr("Touch phones", "Коснуться телефоном"), { if (prepared) touching = true },
+                    Modifier.fillMaxWidth(), icon = Ic.PHONE, enabled = prepared,
+                )
             }
         }
         pairing.firstOrNull()?.let { req ->

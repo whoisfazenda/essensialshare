@@ -122,7 +122,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() { Rt.uiStopped(); super.onStop() }
 }
 
-private enum class Screen { HOME, SETTINGS }
+private enum class Screen { HOME, SETTINGS, TOUCH }
 
 fun localAddress(): String? = runCatching {
     NetworkInterface.getNetworkInterfaces().toList()
@@ -142,14 +142,20 @@ private fun Root() {
         buildList {
             if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
             if (Build.VERSION.SDK_INT >= 37) add("android.permission.ACCESS_LOCAL_NETWORK")
+            // touch to share: advertise so a touched phone can be found with the app closed, scan to do the touching
+            addAll(TouchRadar.permissions)
+            // the direct Wi-Fi link between phones that share no network
+            if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.NEARBY_WIFI_DEVICES)
         }.toTypedArray()
     }
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         Rt.firstRunDone = true
+        Rt.touchAsked = true
         Rt.ensureService()
     }
     LaunchedEffect(Unit) {
-        if (!Rt.firstRunDone && perms.isNotEmpty()) permLauncher.launch(perms) else Rt.ensureService()
+        val missing = perms.filter { !Rt.hasPermission(it) }
+        if (missing.isNotEmpty() && (!Rt.firstRunDone || !Rt.touchAsked)) permLauncher.launch(missing.toTypedArray()) else Rt.ensureService()
     }
 
     BackHandler(enabled = sheetId != null || screen != Screen.HOME) {
@@ -158,11 +164,12 @@ private fun Root() {
 
     Box(Modifier.fillMaxSize().background(N.bg)) {
         when (screen) {
-            Screen.HOME -> HomeScreen(onSettings = { screen = Screen.SETTINGS }, onDevice = { p ->
+            Screen.HOME -> HomeScreen(onSettings = { screen = Screen.SETTINGS }, onTouch = { screen = Screen.TOUCH }, onDevice = { p ->
                 if (p.state == LinkState.SEEN && !p.trusted) Rt.node.connectPeer(p.id)
                 sheetId = p.id
             }, selectedId = sheetId)
             Screen.SETTINGS -> SettingsScreen(onBack = { screen = Screen.HOME })
+            Screen.TOUCH -> TouchScreen(emptyList(), null, canPick = true) { screen = Screen.HOME }
         }
         val peers by Rt.node.peers.collectAsState()
         val sheetPeer = peers.firstOrNull { it.id == sheetId }
@@ -188,7 +195,7 @@ private sealed interface Entry {
 }
 
 @Composable
-private fun HomeScreen(onSettings: () -> Unit, onDevice: (PeerInfo) -> Unit, selectedId: String?) {
+private fun HomeScreen(onSettings: () -> Unit, onTouch: () -> Unit, onDevice: (PeerInfo) -> Unit, selectedId: String?) {
     val ctx = LocalContext.current
     val peers by Rt.node.peers.collectAsState()
     val transfers by Rt.node.transfers.collectAsState()
@@ -222,6 +229,19 @@ private fun HomeScreen(onSettings: () -> Unit, onDevice: (PeerInfo) -> Unit, sel
             )
         }
         item {
+            Row(
+                Modifier.fillMaxWidth().nCard(24.dp, N.surfaceRaised).clickable(onClick = onTouch).padding(horizontal = 18.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                NIcon(Ic.PHONE, size = 28.dp)
+                Column(Modifier.weight(1f)) {
+                    NText(tr("Touch to share", "Поделиться касанием"), style = NType.bodyMedium, maxLines = 1)
+                    NMeta(tr("Hold two phones together", "Приложите два телефона друг к другу"), maxLines = 2)
+                }
+                NIcon(Ic.SEND, tint = N.secondary)
+            }
+        }
+        item {
             Row(Modifier.padding(top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 NCaps(tr("Nearby", "Рядом"))
                 Gapw8()
@@ -233,7 +253,7 @@ private fun HomeScreen(onSettings: () -> Unit, onDevice: (PeerInfo) -> Unit, sel
                 ShapesArt(Modifier.fillMaxWidth().height(72.dp))
                 NText(tr("Looking for devices…", "Ищем устройства…"), style = NType.bodyMedium)
                 NMeta(
-                    tr("Open Essential Share on your PC. Both devices must be on the same Wi-Fi.", "Откройте Essential Share на компьютере. Оба устройства должны быть в одной сети Wi-Fi."),
+                    tr("Open EShare on your PC. Both devices must be on the same Wi-Fi.", "Откройте EShare на компьютере. Оба устройства должны быть в одной сети Wi-Fi."),
                     maxLines = 4,
                 )
             }
@@ -278,7 +298,7 @@ internal fun openFile(ctx: Context, result: String?) {
     if (mime == "application/vnd.android.package-archive") {
         // the installer ignores apps that are not allowed to install packages: send the user to that switch first
         if (!ctx.packageManager.canRequestPackageInstalls()) {
-            android.widget.Toast.makeText(ctx, tr("Allow Essential Share to install apps, then open the file again", "Разрешите Essential Share устанавливать приложения и откройте файл снова"), android.widget.Toast.LENGTH_LONG).show()
+            android.widget.Toast.makeText(ctx, tr("Allow EShare to install apps, then open the file again", "Разрешите EShare устанавливать приложения и откройте файл снова"), android.widget.Toast.LENGTH_LONG).show()
             runCatching {
                 ctx.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + ctx.packageName)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
@@ -299,16 +319,16 @@ internal fun openFile(ctx: Context, result: String?) {
     }
 }
 
-/** Opens the Essential Share folder in the file manager (falls back to the Downloads list). */
-private fun openFolder(ctx: Context) {
-    val folder = Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADownload%2FEssential%20Share")
+/** Opens the EShare folder in the file manager (falls back to the Downloads list). */
+internal fun openFolder(ctx: Context) {
+    val folder = Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADownload%2FEShare")
     val direct = Intent(Intent.ACTION_VIEW).setDataAndType(folder, "vnd.android.document/directory").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     val ok = runCatching { ctx.startActivity(direct) }.isSuccess
     if (!ok) runCatching { ctx.startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
 }
 
 private fun copyText(ctx: Context, text: String) {
-    ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Essential Share", text))
+    ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("EShare", text))
 }
 
 // ---- send sheet ----------------------------------------------------------------------------------
@@ -448,6 +468,7 @@ private fun SettingsScreen(onBack: () -> Unit) {
             }
         }
         item { SectionCaps(tr("Receiving", "Приём")) }
+        item { OverlayPermissionRow() }
         item {
             SwitchRow(
                 tr("Always ready to receive", "Всегда готов к приёму"),
@@ -471,7 +492,7 @@ private fun SettingsScreen(onBack: () -> Unit) {
             Row(Modifier.fillMaxWidth().nCard(24.dp).padding(18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) {
                     NText(tr("Received files", "Полученные файлы"), style = NType.bodyMedium)
-                    NMeta("Downloads / Essential Share")
+                    NMeta("Downloads / EShare")
                 }
                 NButton(tr("Open", "Открыть"), { openFolder(ctx) })
             }

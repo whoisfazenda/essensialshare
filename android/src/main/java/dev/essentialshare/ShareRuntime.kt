@@ -41,7 +41,7 @@ class PrefsStore(private val p: SharedPreferences) : Store {
     override fun put(key: String, value: String) { p.edit().putString(key, value).apply() }
 }
 
-/** Saves received files into Downloads/Essential Share through MediaStore (no storage permission needed). */
+/** Saves received files into Downloads/EShare through MediaStore (no storage permission needed). */
 class MediaStoreReceiver(private val ctx: Context) : FileReceiver {
     /** "name.ext" -> "name (1).ext", "name (2).ext"...: the extension always stays last. */
     private fun uniqueName(resolver: android.content.ContentResolver, relPath: String, file: String): String {
@@ -65,7 +65,7 @@ class MediaStoreReceiver(private val ctx: Context) : FileReceiver {
         val parts = name.split('/')
         val sub = parts.dropLast(1).joinToString("/")
         val resolver = ctx.contentResolver
-        val relPath = "Download/Essential Share" + if (sub.isNotEmpty()) "/$sub" else ""
+        val relPath = "Download/EShare" + if (sub.isNotEmpty()) "/$sub" else ""
         val file = uniqueName(resolver, relPath, parts.last())
         // the type follows the extension: a wrong or generic type makes MediaStore rewrite the name
         val ext = file.substringAfterLast('.', "").lowercase()
@@ -156,7 +156,7 @@ object Rt {
         config = NodeConfig(prefs.getString("deviceName", null) ?: defaultName(), prefs.getBoolean("autoAccept", true))
         node = ShareNode(Identity.load(store), store, config, MediaStoreReceiver(app), Platform.ANDROID) { Log.d("EssentialShare", it) }
         dev.essentialshare.ui.ThemeState.mode = themeMode
-        scope.launch { node.events.collect { Notifier.onEvent(app, it) } }
+        scope.launch { node.events.collect { Notifier.onEvent(app, it); TouchOverlay.onEvent(app, it) } }
     }
 
     private fun defaultName(): String {
@@ -190,6 +190,11 @@ object Rt {
     var themeMode: dev.essentialshare.ui.ThemeMode
         get() = runCatching { dev.essentialshare.ui.ThemeMode.valueOf(prefs.getString("theme", null) ?: "SYSTEM") }.getOrDefault(dev.essentialshare.ui.ThemeMode.SYSTEM)
         set(v) { prefs.edit().putString("theme", v.name).apply(); dev.essentialshare.ui.ThemeState.mode = v }
+
+    /** The Bluetooth permissions of touch to share were asked for once at start-up. */
+    var touchAsked: Boolean
+        get() = prefs.getBoolean("touchAsked2", false)
+        set(v) { prefs.edit().putBoolean("touchAsked2", v).apply() }
 
     var firstRunDone: Boolean
         get() = prefs.getBoolean("firstRun", false)
@@ -227,8 +232,10 @@ object Rt {
 
     fun setClipboard(ctx: Context, text: String) {
         val cm = ctx.getSystemService(ClipboardManager::class.java)
-        cm.setPrimaryClip(ClipData.newPlainText("Essential Share", text))
+        cm.setPrimaryClip(ClipData.newPlainText("EShare", text))
     }
+
+    fun appContext(): Context = app
 
     fun powerManager(ctx: Context): PowerManager = ctx.getSystemService(PowerManager::class.java)
 

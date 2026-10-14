@@ -33,7 +33,7 @@ private fun fakeState(): UiState {
         ),
         texts = listOf(TextItem(9, "p1", "Nothing Phone (3a)", "https://nothing.tech/pages/essential-space", true, false, now - 90_000)),
         selectedId = "p1",
-        saveDir = "C:\\Users\\Administrator\\Downloads\\Essential Share",
+        saveDir = "C:\\Users\\Administrator\\Downloads\\EShare",
         message = "Clipboard sent",
     )
 }

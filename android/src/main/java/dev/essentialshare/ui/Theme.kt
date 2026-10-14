@@ -385,7 +385,7 @@ fun ShapesArt(modifier: Modifier = Modifier) {
 @Composable
 fun Logotype(modifier: Modifier = Modifier, color: Color = N.display) {
     BasicText(
-        "ESSENTIAL SHARE", modifier,
+        "EShare", modifier,
         style = TextStyle(fontFamily = DotFont, fontSize = 13.sp, letterSpacing = 0.04.em, color = color).forText(""), maxLines = 1, softWrap = false,
     )
 }
@@ -430,7 +430,7 @@ fun DrawScope.drawDotPattern(pattern: List<String>, tint: Color, dotScale: Float
 class RadarDot(val key: String, val ready: Boolean, val selected: Boolean, val phone: Boolean = true)
 
 /** Draws a pixel pattern with its top-left corner at ([x], [y]). */
-private fun DrawScope.glyphAt(pattern: List<String>, x: Float, y: Float, pitch: Float, color: Color, alpha: Float, radius: Float) {
+internal fun DrawScope.glyphAt(pattern: List<String>, x: Float, y: Float, pitch: Float, color: Color, alpha: Float, radius: Float) {
     for (r in pattern.indices) for (c in pattern[r].indices) {
         if (pattern[r][c] == '#') drawCircle(color.copy(alpha = alpha), radius, Offset(x + c * pitch + pitch / 2, y + r * pitch + pitch / 2))
     }

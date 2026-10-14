@@ -14,8 +14,8 @@ android {
         minSdk = 34
         // Staying below 37 keeps local network access implicitly granted; the permission is still requested on Android 17+
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     // Release signing: put your keystore details in keystore.properties (git-ignored) at the repo root:

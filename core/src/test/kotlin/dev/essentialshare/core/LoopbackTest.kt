@@ -1,5 +1,7 @@
 package dev.essentialshare.core
 
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
@@ -49,6 +51,43 @@ class LoopbackTest {
         override val size = f.length()
         override val mime = "application/octet-stream"
         override fun open(): InputStream = f.inputStream()
+    }
+
+    @Test
+    fun connectNearbyChecksTheTouchedDevice(): Unit = runBlocking<Unit> {
+        val a = node("A", Files.createTempDirectory("esA").toFile())
+        val b = node("B", Files.createTempDirectory("esB").toFile())
+        a.start(); b.start()
+        try {
+            // an id prefix that does not belong to B is refused, B stays unlinked
+            val wrong = java.util.concurrent.CompletableFuture<Boolean>()
+            a.connectNearby("ffffffffffff".takeIf { !b.selfId.startsWith(it) } ?: "000000000000", "127.0.0.1", b.port) { wrong.complete(it) }
+            assertEquals(false, wrong.get(10, java.util.concurrent.TimeUnit.SECONDS))
+
+            // the right prefix links the two, and a second call (the other phone touching at once) is still a success
+            val prefix = b.selfId.take(12)
+            val first = java.util.concurrent.CompletableFuture<Boolean>()
+            a.connectNearby(prefix, "127.0.0.1", b.port) { first.complete(it) }
+            assertEquals(true, first.get(10, java.util.concurrent.TimeUnit.SECONDS))
+            val again = java.util.concurrent.CompletableFuture<Boolean>()
+            a.connectNearby(prefix, "127.0.0.1", b.port) { again.complete(it) }
+            assertEquals(true, again.get(10, java.util.concurrent.TimeUnit.SECONDS))
+            assertTrue(withTimeout(10000) { b.pairing.first { it.isNotEmpty() } }.first().peerId == a.selfId)
+
+            // the touched phone is told, even before it has agreed to pair, so it can show its side of the animation
+            val touched = async(start = CoroutineStart.UNDISPATCHED) {
+                withTimeout(10000) { b.events.first { it is NodeEvent.Touched } }
+            }
+            a.announceTouch(prefix)
+            assertEquals(a.selfId, (touched.await() as NodeEvent.Touched).peerId)
+
+            // nothing listens on the address and nothing was seen: a clean failure, not a hang
+            val dead = java.util.concurrent.CompletableFuture<Boolean>()
+            a.connectNearby("123456789abc".takeIf { !b.selfId.startsWith(it) } ?: "cba987654321", "127.0.0.1", 1) { dead.complete(it) }
+            assertEquals(false, dead.get(10, java.util.concurrent.TimeUnit.SECONDS))
+        } finally {
+            a.stop(); b.stop()
+        }
     }
 
     @Test

@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">Essential Share</string>
+    <string name="app_name">EShare</string>
     <string name="tile_label">Отправить буфер</string>
 </resources>

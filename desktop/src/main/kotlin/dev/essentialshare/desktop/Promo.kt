@@ -62,7 +62,7 @@ private fun promoState(): UiState {
             t(3, Direction.IN, "voice-note.m4a", 1_800_000, 1_800_000, TransferState.DONE, res = "C:/x/voice.m4a"),
         ),
         selectedId = "p1",
-        saveDir = "C:\\Users\\you\\Downloads\\Essential Share",
+        saveDir = "C:\\Users\\you\\Downloads\\EShare",
     )
 }
 
@@ -228,7 +228,7 @@ private fun CardHero() {
         Column(Modifier.align(Alignment.TopCenter).padding(top = 96.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(26.dp)) {
             Brand()
             NText("Send anything.\nInstantly.", style = NType.title.copy(fontSize = 132.sp, lineHeight = 134.sp), align = androidx.compose.ui.text.style.TextAlign.Center)
-            NText("Phone to PC over your own Wi-Fi. No cloud, no accounts.", style = NType.quote.copy(fontSize = 28.sp, lineHeight = 40.sp), color = N.secondary, align = androidx.compose.ui.text.style.TextAlign.Center)
+            NText("Phone to PC over Wi-Fi, phone to phone with a touch. No cloud, no accounts.", style = NType.quote.copy(fontSize = 28.sp, lineHeight = 40.sp), color = N.secondary, align = androidx.compose.ui.text.style.TextAlign.Center)
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 PillLabel("Files", N.yellow, Color(0xFF1C1C1C))
                 PillLabel("Photos", N.ink, N.onInk)
@@ -382,6 +382,47 @@ private fun CardFast() {
     }
 }
 
+/** Touch to share: two dot-matrix phones meet and rings of dots burst out. */
+@Composable
+private fun CardTouch() {
+    Box(Modifier.fillMaxSize().background(N.bg)) {
+        DotGrid(); Marks()
+        Column(Modifier.align(Alignment.TopCenter).padding(top = 90.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(26.dp)) {
+            Brand()
+            NText("Touch phones.\nSend anything.", style = NType.title.copy(fontSize = 118.sp, lineHeight = 122.sp), align = androidx.compose.ui.text.style.TextAlign.Center)
+        }
+        Canvas(Modifier.align(Alignment.BottomCenter).padding(bottom = 190.dp).size(1700.dp, 480.dp)) {
+            val gp = 19.dp.toPx()
+            val gw = gp * 9
+            val cx = size.width / 2
+            val cy = size.height / 2
+            val top = cy - gw / 2
+            val bodyHalf = 2.5f * gp
+            val off = bodyHalf + gp * 1.5f
+            // rings of dots from the meeting point, fading with distance
+            for (j in 0 until 4) {
+                val r = gw * 0.62f + j * gp * 2.3f
+                val n = (2 * Math.PI * r / (gp * 0.95f)).toInt()
+                val color = if (j == 0) N.yellow else N.ink
+                for (k in 0 until n) {
+                    val a = 2 * Math.PI * k / n + j * 0.17
+                    drawCircle(color.copy(alpha = (0.95f - j * 0.2f).coerceAtLeast(0.1f)), ((4.4f - j * 0.8f).coerceAtLeast(1.6f)).dp.toPx(), Offset(cx + (r * Math.cos(a)).toFloat(), cy + (r * Math.sin(a)).toFloat()))
+                }
+            }
+            val phone = DOT_ICONS["PHONE"]!!
+            fun glyph(x: Float, color: Color) {
+                for (r in phone.indices) for (c in phone[r].indices) if (phone[r][c] == '#') drawCircle(color, gp * 0.4f, Offset(x + c * gp + gp / 2, top + r * gp + gp / 2))
+            }
+            glyph(cx - off - gw / 2, N.ink)
+            glyph(cx + off - gw / 2, N.ink)
+            drawCircle(N.yellow, gp * 0.8f, Offset(cx, cy))
+        }
+        NText(
+            "Bluetooth feels the touch. Wi-Fi sends the files.", Modifier.align(Alignment.BottomCenter).padding(bottom = 118.dp),
+            NType.quote.copy(fontSize = 30.sp, lineHeight = 40.sp), N.secondary,
+        )
+    }
+}
 /** Free on GitHub. */
 @Composable
 private fun CardGithub() {
@@ -422,5 +463,6 @@ fun main(args: Array<String>) {
     render("promo-5-private-dark", false) { CardPrivate() }
     render("promo-6-anything", true) { CardTypes() }
     render("promo-7-github-dark", false) { CardGithub() }
+    render("promo-8-touch-dark", false) { CardTouch() }
     println("promo cards in $out")
 }

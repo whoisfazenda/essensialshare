@@ -390,7 +390,7 @@ fun ShapesArt(modifier: Modifier = Modifier) {
 @Composable
 fun Logotype(modifier: Modifier = Modifier, color: Color = N.display) {
     BasicText(
-        "ESSENTIAL SHARE", modifier,
+        "EShare", modifier,
         style = TextStyle(fontFamily = DotFont, fontSize = 13.sp, letterSpacing = 0.04.em, color = color).forText(""), maxLines = 1, softWrap = false,
     )
 }

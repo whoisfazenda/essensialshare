@@ -103,7 +103,7 @@ object Handshake {
         output.flush()
 
         val magic = ByteArray(4).also { input.readFully(it) }
-        if (!magic.contentEquals(MAGIC)) throw IOException("not an Essential Share peer")
+        if (!magic.contentEquals(MAGIC)) throw IOException("not an EShare peer")
         val peerEph = ByteArray(32).also { input.readFully(it) }
         val peerStatic = ByteArray(32).also { input.readFully(it) }
         if (peerStatic.contentEquals(me.publicRaw)) throw IOException("connected to self")

@@ -190,7 +190,7 @@ private fun LeftPane(ui: UiState, act: Actions, modifier: Modifier) {
             Column(Modifier.nCard(24.dp).fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 NText(tr("Looking for devices…", "Ищем устройства…"), style = NType.bodyMedium)
                 NMeta(
-                    tr("Open Essential Share on your phone. Both devices must be on the same Wi-Fi.", "Откройте Essential Share на телефоне. Оба устройства должны быть в одной сети Wi-Fi."),
+                    tr("Open EShare on your phone. Both devices must be on the same Wi-Fi.", "Откройте EShare на телефоне. Оба устройства должны быть в одной сети Wi-Fi."),
                     maxLines = 4,
                 )
             }
@@ -539,7 +539,7 @@ private fun SettingsPane(ui: UiState, act: Actions) {
         item { SectionCaps(tr("Windows", "Windows")) }
         item { SwitchRow(tr("Keep running in the tray when closed", "Оставаться в трее при закрытии"), tr("Needed to receive files in the background", "Нужно, чтобы принимать файлы в фоне"), ui.settings.minimizeToTray, act::setMinimizeToTray) }
         item { SwitchRow(tr("Start with Windows", "Запускать вместе с Windows"), if (ui.settings.canIntegrate) tr("Starts minimized in the tray", "Запускается свёрнутым в трей") else tr("Only in the installed app", "Только в установленном приложении"), ui.settings.autostart, act::setAutostart, enabled = ui.settings.canIntegrate) }
-        item { SwitchRow(tr("“Send via Essential Share” in the right-click menu", "«Отправить через Essential Share» в меню правой кнопки"), if (ui.settings.canIntegrate) tr("Windows 11: under “Show more options” (or Shift+right-click)", "Windows 11: в «Показать дополнительные параметры» (или Shift + правая кнопка)") else tr("Only in the installed app", "Только в установленном приложении"), ui.settings.sendTo, act::setSendTo, enabled = ui.settings.canIntegrate) }
+        item { SwitchRow(tr("“Send via EShare” in the right-click menu", "«Отправить через EShare» в меню правой кнопки"), if (ui.settings.canIntegrate) tr("Windows 11: under “Show more options” (or Shift+right-click)", "Windows 11: в «Показать дополнительные параметры» (или Shift + правая кнопка)") else tr("Only in the installed app", "Только в установленном приложении"), ui.settings.sendTo, act::setSendTo, enabled = ui.settings.canIntegrate) }
         item { SectionCaps(tr("Network", "Сеть")) }
         item {
             Row(

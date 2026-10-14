@@ -19,7 +19,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.Properties
 
-/** Settings and identity keys in %APPDATA%\Essential Share\settings.properties. */
+/** Settings and identity keys in %APPDATA%\EShare\settings.properties (moved there from the old "Essential Share" folder). */
 class Settings(private val file: File) : Store {
     private val props = Properties()
 
@@ -32,7 +32,7 @@ class Settings(private val file: File) : Store {
 
     @Synchronized override fun put(key: String, value: String) {
         props.setProperty(key, value)
-        runCatching { file.writer(Charsets.UTF_8).use { props.store(it, "Essential Share") } }
+        runCatching { file.writer(Charsets.UTF_8).use { props.store(it, "EShare") } }
     }
 
     fun bool(key: String, def: Boolean) = get(key)?.toBooleanStrictOrNull() ?: def
@@ -40,11 +40,17 @@ class Settings(private val file: File) : Store {
 
     companion object {
         fun default(): Settings {
-            val base = System.getenv("APPDATA")?.let { File(it, "Essential Share") } ?: File(System.getProperty("user.home"), ".essential-share")
+            val appData = System.getenv("APPDATA")
+            val base = appData?.let { File(it, "EShare") } ?: File(System.getProperty("user.home"), ".eshare")
+            // the app used to be called Essential Share: keep its identity and pairings by moving the settings over once
+            val legacy = appData?.let { File(it, "Essential Share/settings.properties") }
+            if (legacy != null && legacy.exists() && !File(base, "settings.properties").exists()) {
+                runCatching { base.mkdirs(); legacy.copyTo(File(base, "settings.properties")) }
+            }
             return Settings(File(base, "settings.properties"))
         }
 
-        fun defaultSaveDir() = File(System.getProperty("user.home"), "Downloads/Essential Share")
+        fun defaultSaveDir() = File(System.getProperty("user.home"), "Downloads/EShare")
         fun defaultDeviceName(): String = runCatching { InetAddress.getLocalHost().hostName }.getOrNull()?.takeIf { it.isNotBlank() } ?: "Windows PC"
     }
 }
@@ -121,7 +127,7 @@ object Shell {
     fun openFolder(dir: File) = runCatching { dir.mkdirs(); Desktop.getDesktop().open(dir) }
 
     /** Path of the packaged launcher, or null when running from Gradle/an IDE. */
-    fun exePath(): String? = ProcessHandle.current().info().command().orElse(null)?.takeIf { it.endsWith("Essential Share.exe", true) }
+    fun exePath(): String? = ProcessHandle.current().info().command().orElse(null)?.takeIf { it.endsWith("EShare.exe", true) }
 
     private fun reg(vararg args: String): Boolean =
         runCatching { ProcessBuilder(listOf("reg") + args).redirectErrorStream(true).start().also { it.inputStream.readBytes() }.waitFor() == 0 }.getOrDefault(false)
@@ -154,12 +160,12 @@ object Shell {
     fun hasContextMenu() = reg("query", "HKCU\\${MENU_KEYS[0]}")
 
     /**
-     * Adds "Send via Essential Share" straight to the right-click menu of files and folders (current user only,
+     * Adds "Send via EShare" straight to the right-click menu of files and folders (current user only,
      * no admin rights). Windows 11 shows classic entries under "Show more options".
      */
     fun setContextMenu(on: Boolean, label: String): Boolean {
         // the old Send to entry is not needed any more
-        File(System.getenv("APPDATA") ?: "", "Microsoft/Windows/SendTo/Essential Share.lnk").delete()
+        File(System.getenv("APPDATA") ?: "", "Microsoft/Windows/SendTo/EShare.lnk").delete()
         if (!on) return MENU_KEYS.map { reg("delete", "HKCU\\$it", "/f") }.all { it } || !hasContextMenu()
         val exe = exePath() ?: return false
         val sb = StringBuilder()

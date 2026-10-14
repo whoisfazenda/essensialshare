@@ -27,7 +27,7 @@ object Notifier {
         nm.createNotificationChannel(
             NotificationChannel(CH_STATUS, tr("Ready to receive", "Готов к приёму"), NotificationManager.IMPORTANCE_MIN).apply {
                 setShowBadge(false)
-                description = tr("Keeps Essential Share reachable from your PC", "Чтобы ПК мог найти телефон и отправить файлы")
+                description = tr("Keeps EShare reachable from your PC", "Чтобы ПК мог найти телефон и отправить файлы")
             },
         )
         nm.createNotificationChannel(
@@ -58,7 +58,7 @@ object Notifier {
     fun serviceNotification(ctx: Context, text: String, progress: Int? = null): Notification =
         NotificationCompat.Builder(ctx, CH_STATUS)
             .setSmallIcon(R.drawable.ic_stat_share)
-            .setContentTitle("Essential Share")
+            .setContentTitle("EShare")
             .setContentText(text)
             .setContentIntent(open(ctx))
             .setOngoing(true).setOnlyAlertOnce(true).setSilent(true).setShowWhen(false)
@@ -100,6 +100,7 @@ object Notifier {
                 builder(ctx).setContentTitle(tr("Transfer failed", "Передача не удалась")).setContentText(e.transfer.name + (e.transfer.error?.let { " · $it" } ?: "")).build(),
             )
             is NodeEvent.Paired -> {}
+            is NodeEvent.Touched -> {}
         }
     }
 

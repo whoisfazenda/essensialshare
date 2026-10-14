@@ -26,14 +26,14 @@ compose.desktop {
         jvmArgs += listOf("-Xmx512m", "-Dfile.encoding=UTF-8")
         nativeDistributions {
             targetFormats(TargetFormat.Exe)
-            packageName = "Essential Share"
-            packageVersion = "1.0.0"
+            packageName = "EShare"
+            packageVersion = "1.1.0"
             description = "Fast local file sharing between your phone and PC"
-            vendor = "Essential Share"
+            vendor = "EShare"
             // X25519 lives in jdk.crypto.ec, which a trimmed runtime would drop
             modules("jdk.crypto.ec", "java.naming", "jdk.unsupported", "java.net.http")
             windows {
-                menuGroup = "Essential Share"
+                menuGroup = "EShare"
                 shortcut = true
                 if (file("icon.ico").exists()) iconFile.set(file("icon.ico"))
             }

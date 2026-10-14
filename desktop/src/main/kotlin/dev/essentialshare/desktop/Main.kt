@@ -108,9 +108,11 @@ class Controller(private val scope: CoroutineScope) : Actions {
                 val first = !settings.bool("menuInstalled", false)
                 if (first || Shell.hasContextMenu()) {
                     settings.putBool("menuInstalled", true)
-                    Shell.setContextMenu(true, tr("Send via Essential Share", "Отправить через Essential Share"))
+                    Shell.setContextMenu(true, tr("Send via EShare", "Отправить через EShare"))
                     settingsState = readSettings()
                 }
+                // an update that renamed the program must not leave autostart pointing at the old file
+                if (settings.bool("autostart", false)) Shell.setAutostart(true)
             }
         }
     }
@@ -218,7 +220,7 @@ class Controller(private val scope: CoroutineScope) : Actions {
     }
 
     override fun setSendTo(v: Boolean) {
-        if (!Shell.setContextMenu(v, tr("Send via Essential Share", "Отправить через Essential Share"))) say(tr("Could not change the right-click menu", "Не удалось изменить меню правой кнопки"))
+        if (!Shell.setContextMenu(v, tr("Send via EShare", "Отправить через EShare"))) say(tr("Could not change the right-click menu", "Не удалось изменить меню правой кнопки"))
         settingsState = readSettings()
     }
 
@@ -287,6 +289,7 @@ fun main(args: Array<String>) {
                         trayState.sendNotification(Notification(e.item.peerName, if (e.item.clipboard) tr("Clipboard received", "Получен буфер обмена") else e.item.text.take(120)))
                     }
                     is NodeEvent.TransferFailed -> {}
+                    is NodeEvent.Touched -> {}
                 }
             }
         }
@@ -307,7 +310,7 @@ fun main(args: Array<String>) {
         LaunchedEffect(c.message) { if (c.message != null) { delay(4000); c.message = null } }
 
         Tray(
-            icon = AppIcon, tooltip = "Essential Share", onAction = { c.bringToFront() },
+            icon = AppIcon, tooltip = "EShare", onAction = { c.bringToFront() },
             menu = {
                 Item(tr("Open", "Открыть"), onClick = { c.bringToFront() })
                 Item(tr("Open save folder", "Открыть папку с файлами"), onClick = { c.openSaveDir() })
@@ -324,7 +327,7 @@ fun main(args: Array<String>) {
             onCloseRequest = {
                 if (c.settingsState.minimizeToTray) c.visible = false else { c.clipboard.stop(); c.node.stop(); exitApplication() }
             },
-            visible = c.visible, state = state, title = "Essential Share", icon = AppIcon,
+            visible = c.visible, state = state, title = "EShare", icon = AppIcon,
             undecorated = true, resizable = false,
         ) {
             LaunchedEffect(c.focusTick) { if (c.focusTick > 0) { state.isMinimized = false; window.toFront(); window.requestFocus() } }

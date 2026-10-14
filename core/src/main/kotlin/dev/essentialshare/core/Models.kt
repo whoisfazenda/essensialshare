@@ -82,6 +82,9 @@ sealed class NodeEvent {
     data class FileReceived(val transfer: TransferInfo) : NodeEvent()
     data class TextReceived(val item: TextItem) : NodeEvent()
     data class TransferFailed(val transfer: TransferInfo) : NodeEvent()
+
+    /** The other phone says it was touched to this one: the host may show the "receiving" animation. */
+    data class Touched(val peerId: String, val name: String) : NodeEvent()
 }
 
 /** A file the host wants to send. [open] is called on a worker thread. */

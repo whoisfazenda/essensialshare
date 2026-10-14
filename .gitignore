@@ -10,3 +10,4 @@ dist/
 keystore.properties
 *.jks
 *.keystore
+promo/
